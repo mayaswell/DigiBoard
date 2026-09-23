@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DigiBoard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+
+  :root {
+    --gold: #c9a84c; --gold-light: #e8c96a;
+    --blood: #8b1a1a; --parchment: #f2e8d0;
+    --shadow: rgba(10,5,0,0.7); --glow: rgba(201,168,76,0.4);
+    --panel-w: 270px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0a05; font-family: 'Crimson Text', serif;
+    color: var(--parchment); height: 100vh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ── TOOLBAR ── */
+  #toolbar {
+    background: linear-gradient(180deg,#1e1408,#150f06);
+    border-bottom: 2px solid var(--gold);
+    padding: 7px 14px; display: flex; align-items: center;
+    gap: 9px; flex-wrap: wrap;
+    box-shadow: 0 4px 20px var(--shadow); z-index: 100; flex-shrink: 0;
+  }
+  #toolbar h1 {
+    font-family:'Cinzel',serif; font-weight:900; font-size:1.15rem;
+    color:var(--gold); letter-spacing:0.12em;
+    text-shadow:0 0 18px var(--glow); white-space:nowrap;
+  }
+  .divider { width:1px; height:26px; background:var(--gold); opacity:0.3; flex-shrink:0; }
+  .btn {
+    background:linear-gradient(180deg,#2e200e,#1a1008);
+    border:1px solid var(--gold); color:var(--gold-light);
+    font-family:'Cinzel',serif; font-size:0.63rem; letter-spacing:0.08em;
+    padding:5px 11px; cursor:pointer; transition:all 0.2s;
+    white-space:nowrap; text-transform:uppercase; flex-shrink:0;
+  }
+  .btn:hover { background:linear-gradient(180deg,#4a3520,#2e200e); box-shadow:0 0 10px var(--glow); color:var(--gold); }
+  .btn.active { background:linear-gradient(180deg,#5a4010,#3a2808); box-shadow:0 0 12px var(--glow); color:var(--gold); border-color:var(--gold-light); }
+  .btn.danger { border-color:var(--blood); color:#d9706a; }
+  .btn.danger:hover { background:linear-gradient(180deg,#3a1010,#200808); box-shadow:0 0 10px rgba(139,26,26,0.5); }
+  label.btn { display:inline-block; }
+  #file-input { display:none; }
+
+  .token-form { display:flex; align-items:center; gap:6px; }
+  .token-form input[type="text"] {
+    background:#1a1008; border:1px solid var(--gold);
+    color:var(--parchment); font-family:'Crimson Text',serif;
+    font-size:0.88rem; padding:4px 9px; width:118px; outline:none;
+    transition:box-shadow 0.2s;
+  }
+  .token-form input[type="text"]:focus { box-shadow:0 0 8px var(--glow); }
+  .token-form input[type="text"]::placeholder { color:#7a6040; font-style:italic; }
+
+  .color-row { display:flex; gap:4px; align-items:center; }
+  .color-swatch {
+    width:17px; height:17px; border-radius:50%;
+    border:2px solid transparent; cursor:pointer;
+    transition:transform 0.15s, border-color 0.15s;
+  }
+  .color-swatch:hover { transform:scale(1.2); }
+  .color-swatch.selected { border-color:var(--gold); transform:scale(1.15); }
+
+  #grid-size {
+    background:#1a1008; border:1px solid var(--gold);
+    color:var(--gold-light); font-family:'Cinzel',serif;
+    font-size:0.63rem; padding:4px 6px; width:50px; outline:none; text-align:center;
+  }
+
+  .slider-group {
+    display:flex; align-items:center; gap:5px; flex-shrink:0;
+  }
+  .slider-label {
+    font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.07em;
+    color:rgba(201,168,76,0.7); white-space:nowrap;
+  }
+  #tok-size-slider {
+    -webkit-appearance:none; appearance:none;
+    width:70px; height:4px; border-radius:2px;
+    background:linear-gradient(90deg,var(--gold) var(--pct,40%),#2e200e var(--pct,40%));
+    outline:none; cursor:pointer;
+  }
+  #tok-size-slider::-webkit-slider-thumb {
+    -webkit-appearance:none; width:13px; height:13px;
+    border-radius:50%; background:var(--gold);
+    border:2px solid #1a1008; cursor:pointer;
+    box-shadow:0 0 6px var(--glow);
+  }
+  #tok-size-val {
+    font-family:'Cinzel',serif; font-size:0.6rem;
+    color:var(--gold-light); width:24px; text-align:right;
+  }
+
+  /* ── MAIN AREA ── */
+  #main {
+    flex:1; display:flex; overflow:hidden; position:relative;
+  }
+
+  /* ── BOARD ── */
+  #board-wrap {
+    flex:1; overflow:hidden; display:flex;
+    align-items:center; justify-content:center;
+    background:#0d0a05; position:relative;
+    transition:margin-right 0.35s cubic-bezier(.4,0,.2,1);
+  }
+  #board-wrap.panel-open { margin-right:var(--panel-w); }
+
+  #board { position:relative; display:inline-block; flex-shrink:0; }
+  #map-img {
+    display:block; max-width:100%; max-height:calc(100vh - 66px);
+    user-select:none; -webkit-user-drag:none;
+    border:2px solid var(--gold); box-shadow:0 0 40px rgba(0,0,0,0.9);
+    opacity:0; transition:opacity 0.5s;
+  }
+  #map-img.loaded { opacity:1; }
+  #placeholder {
+    width:660px; height:460px; border:2px dashed var(--gold);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; opacity:0.4;
+  }
+  #placeholder p { font-family:'Cinzel',serif; font-size:0.9rem; letter-spacing:0.1em; color:var(--gold); }
+  #grid-canvas { position:absolute; top:0; left:0; pointer-events:none; display:none; }
+
+  /* ── TOKENS ── */
+  .token {
+    position:absolute;
+    width:var(--tok-size,32px); height:var(--tok-size,32px);
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,0.85);
+    display:flex; align-items:center; justify-content:center;
+    cursor:grab; user-select:none;
+    box-shadow:0 3px 12px rgba(0,0,0,0.8),0 0 0 1px rgba(0,0,0,0.5);
+    transform:translate(-50%,-50%);
+    transition:box-shadow 0.15s, transform 0.1s, width 0.15s, height 0.15s; z-index:10;
+  }
+  .token:hover { box-shadow:0 4px 18px rgba(0,0,0,0.9),0 0 12px rgba(255,255,255,0.3); transform:translate(-50%,-50%) scale(1.08); z-index:20; }
+  .token.dragging { cursor:grabbing; transform:translate(-50%,-50%) scale(1.15); z-index:100; transition:none; }
+  .token.active-turn {
+    box-shadow:0 0 0 3px var(--gold), 0 0 18px var(--glow), 0 3px 12px rgba(0,0,0,0.8);
+    transform:translate(-50%,-50%) scale(1.12);
+    z-index:15;
+  }
+  .token.active-turn:hover { transform:translate(-50%,-50%) scale(1.18); z-index:25; }
+
+  .token-initial {
+    font-family:'Cinzel',serif; font-weight:900;
+    font-size:calc(var(--tok-size,32px) * 0.38);
+    color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.8); pointer-events:none;
+  }
+  .token-label {
+    position:absolute; bottom:-18px; left:50%; transform:translateX(-50%);
+    white-space:nowrap; font-family:'Cinzel',serif; font-size:0.55rem;
+    letter-spacing:0.05em; color:#fff;
+    text-shadow:0 0 4px #000,1px 1px 2px #000,-1px -1px 2px #000;
+    pointer-events:none; background:rgba(0,0,0,0.6); padding:1px 5px; border-radius:2px;
+  }
+  .token-conditions {
+    position:absolute; top:-8px; left:50%; transform:translateX(-50%);
+    display:flex; flex-wrap:wrap; gap:2px; justify-content:center;
+    pointer-events:none; width:max-content; max-width:130px;
+  }
+  .condition-badge {
+    background:rgba(10,4,0,0.88); border:1px solid var(--gold);
+    color:var(--gold-light); font-family:'Cinzel',serif;
+    font-size:0.46rem; letter-spacing:0.04em;
+    padding:1px 4px; border-radius:2px; white-space:nowrap;
+    pointer-events:all; cursor:pointer; transition:background 0.15s, border-color 0.15s;
+  }
+  .condition-badge:hover { background:rgba(139,26,26,0.88); border-color:#d9706a; color:#ffc0c0; }
+  .token-delete {
+    position:absolute; top:-8px; right:-8px;
+    width:18px; height:18px; background:var(--blood);
+    border:1px solid #d9706a; border-radius:50%;
+    color:#fff; font-size:0.65rem; line-height:17px; text-align:center;
+    cursor:pointer; display:none; z-index:30; box-shadow:0 1px 5px rgba(0,0,0,0.8);
+  }
+  .token:hover .token-delete { display:block; }
+
+  /* ── INITIATIVE PANEL ── */
+  #init-panel {
+    position:absolute; right:0; top:0; bottom:0;
+    width:var(--panel-w);
+    background:linear-gradient(180deg,#1a1208,#110d04);
+    border-left:2px solid var(--gold);
+    display:flex; flex-direction:column;
+    transform:translateX(100%);
+    transition:transform 0.35s cubic-bezier(.4,0,.2,1);
+    z-index:50;
+    box-shadow:-6px 0 30px rgba(0,0,0,0.7);
+  }
+  #init-panel.open { transform:translateX(0); }
+
+  #init-header {
+    padding:12px 14px 10px;
+    border-bottom:1px solid rgba(201,168,76,0.3);
+    flex-shrink:0;
+  }
+  #init-header h2 {
+    font-family:'Cinzel',serif; font-size:0.85rem; letter-spacing:0.14em;
+    color:var(--gold); text-shadow:0 0 12px var(--glow); margin-bottom:10px;
+    text-align:center;
+  }
+  .init-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .init-btn {
+    flex:1; background:linear-gradient(180deg,#2e200e,#1a1008);
+    border:1px solid var(--gold); color:var(--gold-light);
+    font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.07em;
+    padding:5px 6px; cursor:pointer; transition:all 0.2s;
+    text-transform:uppercase; text-align:center; white-space:nowrap;
+  }
+  .init-btn:hover { background:linear-gradient(180deg,#4a3520,#2e200e); box-shadow:0 0 8px var(--glow); color:var(--gold); }
+  .init-btn.next-btn {
+    background:linear-gradient(180deg,#3a2808,#221504);
+    border-color:var(--gold-light); color:var(--gold);
+    font-size:0.65rem;
+  }
+  .init-btn.next-btn:hover { box-shadow:0 0 16px var(--glow); }
+  .init-btn.danger-btn { border-color:var(--blood); color:#d9706a; }
+  .init-btn.danger-btn:hover { background:linear-gradient(180deg,#3a1010,#200808); box-shadow:0 0 8px rgba(139,26,26,0.5); }
+
+  /* Round counter */
+  #round-display {
+    text-align:center; padding:6px 0 0;
+    font-family:'Cinzel',serif; font-size:0.65rem;
+    letter-spacing:0.1em; color:rgba(201,168,76,0.6);
+  }
+  #round-display span { color:var(--gold); font-size:0.8rem; }
+
+  /* Initiative list */
+  #init-list {
+    flex:1; overflow-y:auto; padding:8px 0;
+  }
+  #init-list::-webkit-scrollbar { width:4px; }
+  #init-list::-webkit-scrollbar-track { background:#0d0a05; }
+  #init-list::-webkit-scrollbar-thumb { background:rgba(201,168,76,0.3); border-radius:2px; }
+
+  .init-empty {
+    padding:20px 14px; text-align:center;
+    font-family:'Crimson Text',serif; font-style:italic;
+    font-size:0.85rem; color:#7a6040; line-height:1.5;
+  }
+
+  .init-row {
+    display:flex; align-items:center; gap:8px;
+    padding:6px 12px 6px 10px;
+    border-bottom:1px solid rgba(201,168,76,0.08);
+    transition:background 0.15s;
+    position:relative;
+  }
+  .init-row:hover { background:rgba(201,168,76,0.06); }
+  .init-row.current {
+    background:rgba(201,168,76,0.12);
+    border-left:3px solid var(--gold);
+    padding-left:7px;
+  }
+  .init-row.current .init-name { color:var(--gold); }
+
+  /* Turn arrow */
+  .turn-arrow {
+    font-size:0.8rem; color:var(--gold);
+    text-shadow:0 0 8px var(--glow);
+    width:12px; flex-shrink:0;
+    opacity:0; transition:opacity 0.2s;
+  }
+  .init-row.current .turn-arrow { opacity:1; }
+
+  /* Color dot */
+  .init-dot {
+    width:12px; height:12px; border-radius:50%;
+    border:1.5px solid rgba(255,255,255,0.5);
+    flex-shrink:0;
+  }
+
+  .init-name {
+    flex:1; font-family:'Cinzel',serif; font-size:0.68rem;
+    letter-spacing:0.05em; color:var(--parchment);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  /* Initiative number input */
+  .init-score {
+    width:40px; background:#0d0a05;
+    border:1px solid rgba(201,168,76,0.35); border-radius:2px;
+    color:var(--gold-light); font-family:'Cinzel',serif;
+    font-size:0.75rem; text-align:center; padding:3px 2px;
+    outline:none; transition:border-color 0.2s, box-shadow 0.2s;
+    flex-shrink:0;
+  }
+  .init-score:focus { border-color:var(--gold); box-shadow:0 0 6px var(--glow); }
+  .init-score::placeholder { color:#4a3820; }
+  .init-row.current .init-score { border-color:rgba(201,168,76,0.6); }
+
+  /* Sort button inside row */
+  .init-sort-hint {
+    font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.06em;
+    color:rgba(201,168,76,0.35); text-align:center;
+    padding:0 12px 6px; flex-shrink:0;
+  }
+
+  /* footer note */
+  #init-footer {
+    padding:8px 12px;
+    border-top:1px solid rgba(201,168,76,0.15);
+    font-family:'Crimson Text',serif; font-size:0.72rem;
+    font-style:italic; color:#5a4828; text-align:center;
+    flex-shrink:0; line-height:1.4;
+  }
+
+  /* ── CONTEXT MENU ── */
+  #ctx-menu {
+    display:none; position:fixed; z-index:500;
+    background:linear-gradient(160deg,#1e1408,#120d05);
+    border:1px solid var(--gold); box-shadow:0 6px 30px rgba(0,0,0,0.9);
+    min-width:200px; padding:6px 0;
+  }
+  #ctx-menu.open { display:block; }
+  .ctx-title {
+    font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.1em;
+    color:var(--gold); padding:4px 14px 6px;
+    border-bottom:1px solid rgba(201,168,76,0.25);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .ctx-item {
+    font-family:'Cinzel',serif; font-size:0.63rem; letter-spacing:0.06em;
+    color:var(--parchment); padding:6px 14px; cursor:pointer;
+    transition:background 0.15s; text-transform:uppercase;
+  }
+  .ctx-item:hover { background:rgba(201,168,76,0.12); color:var(--gold); }
+  .ctx-item.danger { color:#d9706a; }
+  .ctx-item.danger:hover { background:rgba(139,26,26,0.25); }
+  .ctx-sep { height:1px; background:rgba(201,168,76,0.2); margin:4px 0; }
+  #ctx-cond-section { padding:5px 10px; }
+  #ctx-cond-section label {
+    display:block; font-family:'Cinzel',serif; font-size:0.55rem;
+    letter-spacing:0.08em; color:rgba(201,168,76,0.6); margin-bottom:4px;
+  }
+  #ctx-cond-row { display:flex; }
+  #ctx-cond-input {
+    flex:1; background:#0d0a05; border:1px solid var(--gold);
+    color:var(--parchment); font-family:'Crimson Text',serif;
+    font-size:0.85rem; padding:3px 7px; outline:none; min-width:0;
+  }
+  #ctx-cond-input::placeholder { color:#7a6040; font-style:italic; }
+  #ctx-cond-btn {
+    background:linear-gradient(180deg,#2e200e,#1a1008);
+    border:1px solid var(--gold); border-left:none;
+    color:var(--gold-light); font-family:'Cinzel',serif;
+    font-size:0.58rem; padding:4px 8px; cursor:pointer; white-space:nowrap;
+  }
+  #ctx-cond-btn:hover { background:linear-gradient(180deg,#4a3520,#2e200e); }
+
+  /* ── RENAME MODAL ── */
+  #modal-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.75); z-index:600;
+    align-items:center; justify-content:center;
+  }
+  #modal-overlay.open { display:flex; }
+  .modal-box {
+    background:linear-gradient(160deg,#1e1408,#120d05);
+    border:1px solid var(--gold); padding:24px 28px; min-width:280px;
+    box-shadow:0 0 60px rgba(0,0,0,0.9);
+  }
+  .modal-box h2 {
+    font-family:'Cinzel',serif; color:var(--gold);
+    font-size:0.9rem; letter-spacing:0.1em; margin-bottom:12px;
+  }
+  .modal-box input {
+    background:#0d0a05; border:1px solid var(--gold);
+    color:var(--parchment); font-family:'Crimson Text',serif;
+    font-size:1rem; padding:6px 11px; width:100%;
+    margin-bottom:12px; outline:none;
+  }
+  .modal-box input:focus { box-shadow:0 0 8px var(--glow); }
+  .modal-btns { display:flex; gap:8px; justify-content:flex-end; }
+
+  /* ── STATUS ── */
+  #status {
+    background:#100c04; border-top:1px solid rgba(201,168,76,0.3);
+    padding:3px 14px; font-family:'Cinzel',serif; font-size:0.57rem;
+    letter-spacing:0.1em; color:rgba(201,168,76,0.5); flex-shrink:0;
+  }
+
+  /* ── DISABLED BUTTONS ── */
+  .btn:disabled, .init-btn:disabled { opacity:0.35; cursor:not-allowed; }
+  .btn:disabled:hover, .init-btn:disabled:hover { box-shadow:none; background:linear-gradient(180deg,#2e200e,#1a1008); color:var(--gold-light); }
+  .init-actions + .init-actions { margin-top:6px; }
+
+  /* ── FX / MEASURE OVERLAY ── */
+  #fx-canvas { position:absolute; top:0; left:0; pointer-events:none; display:block; z-index:6; }
+  #drag-tip {
+    position:fixed; z-index:400; pointer-events:none; display:none;
+    background:rgba(10,6,2,0.92); border:1px solid var(--gold);
+    color:var(--gold-light); font-family:'Cinzel',serif; font-size:0.68rem;
+    letter-spacing:0.05em; padding:3px 9px; border-radius:2px; white-space:nowrap;
+    box-shadow:0 2px 10px rgba(0,0,0,0.8);
+  }
+
+  /* ── ARMED (CONFIRM) DELETE ── */
+  .token-delete.armed {
+    background:#ff2a2a; animation:armed-pulse 0.6s infinite alternate; font-weight:900;
+  }
+  @keyframes armed-pulse { from{ box-shadow:0 0 4px #ff2a2a,0 1px 5px rgba(0,0,0,0.8);} to{ box-shadow:0 0 16px #ff2a2a,0 1px 5px rgba(0,0,0,0.8);} }
+  #ctx-delete.armed { color:#ffb0b0; background:rgba(139,26,26,0.35); }
+
+  /* ── AoE TOGGLE OPTIONS ── */
+  #aoe-options { display:none; align-items:center; gap:6px; }
+  #aoe-options.open { display:flex; }
+  #aoe-shape-select {
+    background:#1a1008; border:1px solid var(--gold);
+    color:var(--gold-light); font-family:'Cinzel',serif;
+    font-size:0.6rem; padding:4px 6px; outline:none;
+  }
+  #unit-size {
+    background:#1a1008; border:1px solid var(--gold);
+    color:var(--gold-light); font-family:'Cinzel',serif;
+    font-size:0.63rem; padding:4px 6px; width:42px; outline:none; text-align:center;
+  }
+
+  /* ── AoE TEMPLATES ── */
+  .aoe-shape {
+    position:absolute; pointer-events:auto; cursor:grab;
+    border:2px dashed rgba(255,255,255,0.75);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:3px; z-index:8; box-sizing:border-box;
+  }
+  .aoe-shape.dragging { cursor:grabbing; z-index:90; }
+  .aoe-shape.aoe-cone { overflow:visible; }
+  .aoe-shape.aoe-cone > svg { position:absolute; top:0; left:0; }
+  .aoe-label {
+    font-family:'Cinzel',serif; font-size:0.58rem; color:#fff;
+    text-shadow:0 0 4px #000,1px 1px 2px #000,-1px -1px 2px #000;
+    pointer-events:none; white-space:nowrap;
+  }
+  /* Delete button sits in normal flex flow at the shape's own center, not a
+     corner — corners get hit-test-clipped by border-radius on circles (and
+     can sit outside a rotated cone/line's box), which made the old
+     corner-positioned button unreachable. Center is always inside. */
+  .aoe-delete {
+    width:18px; height:18px; background:var(--blood);
+    border:1px solid #d9706a; border-radius:50%;
+    color:#fff; font-size:0.62rem; text-align:center; line-height:16px;
+    cursor:pointer; z-index:30; box-shadow:0 1px 5px rgba(0,0,0,0.8);
+    opacity:0.55; transition:opacity 0.15s; flex-shrink:0;
+  }
+  .aoe-shape:hover .aoe-delete { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <h1>⚔ DigiBoard</h1>
+  <div class="divider"></div>
+  <label class="btn" id="load-map-btn">📜 Load Map<input type="file" id="file-input" accept="image/*"></label>
+  <button class="btn" id="grid-toggle-btn">⊞ Grid: OFF</button>
+  <input id="grid-size" type="number" value="50" min="10" max="200" title="Grid size (px per square)">
+  <input id="unit-size" type="number" value="5" min="1" max="50" title="Feet per square">
+  <div class="divider"></div>
+  <div class="token-form">
+    <input type="text" id="token-name" placeholder="Token name…" maxlength="20">
+    <div class="color-row" id="color-row"></div>
+    <button class="btn" id="add-token-btn">+ Add Token</button>
+  </div>
+  <div class="divider"></div>
+  <div class="slider-group">
+    <span class="slider-label">⬤ Size</span>
+    <input type="range" id="tok-size-slider" min="16" max="80" value="32">
+    <span id="tok-size-val">32</span>
+  </div>
+  <div class="divider"></div>
+  <button class="btn" id="measure-toggle-btn" title="Drag on the map to measure distance">📏 Measure</button>
+  <button class="btn" id="aoe-toggle-btn" title="Drag on the map to place an area template">◈ AoE</button>
+  <div id="aoe-options">
+    <select id="aoe-shape-select" title="AoE shape">
+      <option value="circle">Circle</option>
+      <option value="square">Square</option>
+      <option value="cone">Cone</option>
+      <option value="line">Line</option>
+    </select>
+    <div class="color-row" id="aoe-color-row"></div>
+  </div>
+  <div class="divider"></div>
+  <button class="btn" id="init-toggle-btn">⚡ Initiative</button>
+  <button class="btn" id="undo-delete-btn" disabled title="Restore the last removed token">↺ Undo Delete</button>
+  <button class="btn danger" id="clear-aoe-btn" disabled title="Remove all AoE templates">✕ Clear AoE</button>
+  <button class="btn danger" id="clear-tokens-btn">✕ Clear All</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <!-- BOARD -->
+  <div id="board-wrap">
+    <div id="board">
+      <div id="placeholder">
+        <p>⚔ &nbsp; NO MAP LOADED &nbsp; ⚔</p>
+        <p style="font-size:0.75rem">Click "Load Map" to begin your adventure</p>
+      </div>
+      <img id="map-img" src="" alt="map" draggable="false">
+      <canvas id="grid-canvas"></canvas>
+      <canvas id="fx-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- INITIATIVE PANEL -->
+  <div id="init-panel">
+    <div id="init-header">
+      <h2>⚡ Initiative Order</h2>
+      <div class="init-actions">
+        <button class="init-btn" id="prev-turn-btn" disabled>◀ Prev</button>
+        <button class="init-btn next-btn" id="next-turn-btn">▶ Next Turn</button>
+      </div>
+      <div class="init-actions">
+        <button class="init-btn" id="sort-init-btn">↓ Sort</button>
+        <button class="init-btn" id="sync-init-btn">↺ Sync</button>
+        <button class="init-btn danger-btn" id="reset-init-btn">✕ Reset</button>
+      </div>
+      <div id="round-display">Round <span id="round-num">1</span></div>
+    </div>
+    <div id="init-list"></div>
+    <div id="init-footer">Type a roll into each box, then hit Sort. Next Turn advances the tracker — Prev undoes the last advance.</div>
+  </div>
+</div>
+
+<!-- STATUS -->
+<div id="status"></div>
+<div id="drag-tip"></div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu">
+  <div class="ctx-title" id="ctx-token-name">Token</div>
+  <div class="ctx-item" id="ctx-rename">✎ Rename</div>
+  <div class="ctx-item" id="ctx-larger">⊕ Larger</div>
+  <div class="ctx-item" id="ctx-smaller">⊖ Smaller</div>
+  <div class="ctx-sep"></div>
+  <div id="ctx-cond-section">
+    <label>Add Condition</label>
+    <div id="ctx-cond-row">
+      <input type="text" id="ctx-cond-input" placeholder="Poisoned, Bane…" maxlength="20">
+      <button id="ctx-cond-btn">+ Add</button>
+    </div>
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ctx-delete">✕ Remove Token</div>
+</div>
+
+<!-- RENAME MODAL -->
+<div id="modal-overlay">
+  <div class="modal-box">
+    <h2>Rename Token</h2>
+    <input type="text" id="modal-input" maxlength="20">
+    <div class="modal-btns">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn" id="modal-confirm">Rename</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Colors ─────────────────────────────────────────────────
+const COLORS = ['#e05252','#52a0e0','#52c068','#e0c052','#b052e0','#e09052','#52d8d0','#e8e8e8'];
+let selectedColor = COLORS[0];
+
+const colorRow = document.getElementById('color-row');
+COLORS.forEach(hex => {
+  const sw = document.createElement('div');
+  sw.className = 'color-swatch' + (hex === selectedColor ? ' selected' : '');
+  sw.style.background = hex;
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+    sw.classList.add('selected');
+    selectedColor = hex;
+  });
+  colorRow.appendChild(sw);
+});
+
+// ── Map ─────────────────────────────────────────────────────
+const mapImg = document.getElementById('map-img');
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  mapImg.src = URL.createObjectURL(file);
+  mapImg.onload = () => {
+    document.getElementById('placeholder').style.display = 'none';
+    mapImg.classList.add('loaded');
+    resizeCanvas(); if (gridOn) drawGrid();
+    updateStatus();
+  };
+  e.target.value = '';
+});
+
+// ── Grid ─────────────────────────────────────────────────────
+let gridOn = false;
+const gridCanvas = document.getElementById('grid-canvas');
+const gridCtx    = gridCanvas.getContext('2d');
+const gridToggleBtn = document.getElementById('grid-toggle-btn');
+const gridSizeInput = document.getElementById('grid-size');
+const unitSizeInput = document.getElementById('unit-size');
+const fxCanvas = document.getElementById('fx-canvas');
+const fxCtx    = fxCanvas.getContext('2d');
+
+// ── Distance / grid-scale helpers ──────────────────────────────
+function gridPxVal()      { return Math.max(10, parseInt(gridSizeInput.value) || 50); }
+function feetPerSquareVal(){ return Math.max(1, parseFloat(unitSizeInput.value) || 5); }
+function pxToSquares(px)  { return px / gridPxVal(); }
+function roundHalf(n)     { return Math.round(n * 2) / 2; }
+function formatDistance(px) {
+  const sq = roundHalf(pxToSquares(px));
+  const ft = Math.round(sq * feetPerSquareVal());
+  return `${sq} sq · ${ft} ft`;
+}
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function toBoardCoords(clientX, clientY) {
+  const r = document.getElementById('board').getBoundingClientRect();
+  return { x: clientX - r.left, y: clientY - r.top };
+}
+
+// ── FX overlay (measuring line / AoE preview) ──────────────────
+function clearFX() { fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height); }
+function drawFXLine(a, b) {
+  clearFX();
+  fxCtx.save();
+  fxCtx.strokeStyle = 'rgba(232,201,106,0.9)';
+  fxCtx.lineWidth = 2;
+  fxCtx.setLineDash([6,5]);
+  fxCtx.beginPath(); fxCtx.moveTo(a.x,a.y); fxCtx.lineTo(b.x,b.y); fxCtx.stroke();
+  fxCtx.setLineDash([]);
+  fxCtx.fillStyle = 'rgba(232,201,106,0.9)';
+  [a,b].forEach(p => { fxCtx.beginPath(); fxCtx.arc(p.x,p.y,4,0,Math.PI*2); fxCtx.fill(); });
+  fxCtx.restore();
+}
+
+// ── Floating distance tooltip (shared by drag / measure / AoE) ─
+const dragTip = document.getElementById('drag-tip');
+function showDragTip(x, y, text) {
+  dragTip.textContent = text;
+  dragTip.style.left = (x + 16) + 'px';
+  dragTip.style.top  = (y + 16) + 'px';
+  dragTip.style.display = 'block';
+}
+function hideDragTip() { dragTip.style.display = 'none'; }
+
+gridToggleBtn.addEventListener('click', () => {
+  gridOn = !gridOn;
+  gridToggleBtn.textContent = `⊞ Grid: ${gridOn ? 'ON' : 'OFF'}`;
+  gridToggleBtn.classList.toggle('active', gridOn);
+  gridCanvas.style.display = gridOn ? 'block' : 'none';
+  if (gridOn) { resizeCanvas(); drawGrid(); }
+});
+gridSizeInput.addEventListener('input', () => { if (gridOn) drawGrid(); });
+
+function resizeCanvas() {
+  gridCanvas.width  = mapImg.offsetWidth;
+  gridCanvas.height = mapImg.offsetHeight;
+  gridCanvas.style.width  = mapImg.offsetWidth  + 'px';
+  gridCanvas.style.height = mapImg.offsetHeight + 'px';
+  fxCanvas.width  = mapImg.offsetWidth;
+  fxCanvas.height = mapImg.offsetHeight;
+  fxCanvas.style.width  = mapImg.offsetWidth  + 'px';
+  fxCanvas.style.height = mapImg.offsetHeight + 'px';
+}
+window.addEventListener('resize', () => { resizeCanvas(); if (gridOn) drawGrid(); });
+function drawGrid() {
+  const W = gridCanvas.width, H = gridCanvas.height;
+  const sz = Math.max(10, parseInt(gridSizeInput.value) || 50);
+  gridCtx.clearRect(0, 0, W, H);
+  gridCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+  gridCtx.lineWidth = 0.8;
+  for (let x = 0; x <= W; x += sz) { gridCtx.beginPath(); gridCtx.moveTo(x,0); gridCtx.lineTo(x,H); gridCtx.stroke(); }
+  for (let y = 0; y <= H; y += sz) { gridCtx.beginPath(); gridCtx.moveTo(0,y); gridCtx.lineTo(W,y); gridCtx.stroke(); }
+}
+
+// ── Tokens ───────────────────────────────────────────────────
+let tokens = [], tokenCounter = 0;
+let armedDelBtn = null;
+let deletedStack = [];
+
+document.getElementById('add-token-btn').addEventListener('click', spawnToken);
+document.getElementById('token-name').addEventListener('keydown', e => { if (e.key === 'Enter') spawnToken(); });
+
+function spawnToken() {
+  const inp = document.getElementById('token-name');
+  const name = inp.value.trim() || `Token ${++tokenCounter}`;
+  inp.value = '';
+  const board = document.getElementById('board');
+  createToken(name, selectedColor,
+    (board.offsetWidth  || 340) / 2 + (Math.random()-.5)*60,
+    (board.offsetHeight || 240) / 2 + (Math.random()-.5)*60
+  );
+  updateStatus();
+  if (initOpen) syncInitList();
+}
+
+function createToken(name, color, x, y) {
+  const board = document.getElementById('board');
+  const el = document.createElement('div');
+  el.className = 'token';
+  el.style.cssText = `background:${color}; left:${x}px; top:${y}px`;
+  el.dataset.name  = name;
+  el.dataset.color = color;
+  setTokenSize(el, globalTokSize);
+
+  const condWrap = document.createElement('div');
+  condWrap.className = 'token-conditions';
+
+  const initial = document.createElement('div');
+  initial.className = 'token-initial';
+  initial.textContent = name[0].toUpperCase();
+
+  const label = document.createElement('div');
+  label.className = 'token-label';
+  label.textContent = name;
+
+  const delBtn = document.createElement('div');
+  delBtn.className = 'token-delete';
+  delBtn.textContent = '✕';
+  delBtn.title = 'Click twice to remove';
+  delBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (delBtn.classList.contains('armed')) {
+      clearTimeout(delBtn._armTimer);
+      if (armedDelBtn === delBtn) armedDelBtn = null;
+      doDeleteToken(el);
+    } else {
+      if (armedDelBtn && armedDelBtn !== delBtn) {
+        clearTimeout(armedDelBtn._armTimer);
+        armedDelBtn.classList.remove('armed');
+        armedDelBtn.textContent = '✕';
+      }
+      delBtn.classList.add('armed');
+      delBtn.textContent = '!';
+      armedDelBtn = delBtn;
+      delBtn._armTimer = setTimeout(() => {
+        delBtn.classList.remove('armed');
+        delBtn.textContent = '✕';
+        if (armedDelBtn === delBtn) armedDelBtn = null;
+      }, 2200);
+    }
+  });
+
+  el.append(condWrap, initial, label, delBtn);
+  board.appendChild(el);
+  el.addEventListener('contextmenu', e => { e.preventDefault(); openCtx(e, el, initial, label, condWrap); });
+  makeDraggable(el);
+  tokens.push(el);
+}
+
+function removeToken(el) {
+  el.remove();
+  tokens = tokens.filter(t => t !== el);
+  updateStatus();
+  if (initOpen) {
+    // remove from initiative rows if present
+    const id = el.dataset.initId;
+    if (id) initRows = initRows.filter(r => r.id !== id);
+    renderInitList();
+  }
+}
+
+// Snapshot everything needed to fully reconstruct a token, for Undo Delete.
+function snapshotToken(el) {
+  const condWrap = el.querySelector('.token-conditions');
+  const conditions = condWrap ? Array.from(condWrap.children).map(b => b.textContent) : [];
+  let initScore = '', initIndex = -1;
+  if (el.dataset.initId) {
+    const idx = initRows.findIndex(r => r.id === el.dataset.initId);
+    if (idx > -1) { initScore = initRows[idx].score; initIndex = idx; }
+  }
+  return {
+    name: el.dataset.name, color: el.dataset.color,
+    left: el.style.left, top: el.style.top,
+    size: el.dataset.size, customSize: el.dataset.customSize || '',
+    conditions, initScore, initIndex,
+  };
+}
+
+// The single choke point for an intentional token delete: snapshots for undo,
+// then actually removes it.
+function doDeleteToken(el) {
+  deletedStack.push(snapshotToken(el));
+  if (deletedStack.length > 12) deletedStack.shift();
+  document.getElementById('undo-delete-btn').disabled = false;
+  removeToken(el);
+}
+
+// ── Conditions ───────────────────────────────────────────────
+function addBadge(condWrap, text) {
+  if (!text.trim()) return;
+  const b = document.createElement('div');
+  b.className = 'condition-badge';
+  b.textContent = text.trim();
+  b.title = 'Click to remove';
+  b.addEventListener('click', e => { e.stopPropagation(); b.remove(); });
+  condWrap.appendChild(b);
+}
+
+// ── Context Menu ─────────────────────────────────────────────
+const ctxMenu = document.getElementById('ctx-menu');
+const ctxDeleteEl = document.getElementById('ctx-delete');
+let ctxEl, ctxInitial, ctxLabel, ctxCondWrap;
+let ctxDeleteArmed = false, ctxDelTimeout = null;
+
+function resetCtxDeleteArm() {
+  ctxDeleteArmed = false;
+  clearTimeout(ctxDelTimeout);
+  ctxDeleteEl.textContent = '✕ Remove Token';
+  ctxDeleteEl.classList.remove('armed');
+}
+
+function openCtx(e, el, initial, label, condWrap) {
+  ctxEl = el; ctxInitial = initial; ctxLabel = label; ctxCondWrap = condWrap;
+  resetCtxDeleteArm();
+  document.getElementById('ctx-token-name').textContent = el.dataset.name;
+  document.getElementById('ctx-cond-input').value = '';
+  ctxMenu.style.cssText = `left:${e.clientX}px; top:${e.clientY}px`;
+  ctxMenu.classList.add('open');
+  requestAnimationFrame(() => {
+    const r = ctxMenu.getBoundingClientRect();
+    if (r.right  > innerWidth)  ctxMenu.style.left = (e.clientX - r.width)  + 'px';
+    if (r.bottom > innerHeight) ctxMenu.style.top  = (e.clientY - r.height) + 'px';
+  });
+}
+const closeCtx = () => { ctxMenu.classList.remove('open'); resetCtxDeleteArm(); };
+document.addEventListener('click', e => { if (!ctxMenu.contains(e.target)) closeCtx(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCtx(); closeModal(); } });
+document.getElementById('ctx-rename').addEventListener('click', () => { closeCtx(); openModal(); });
+
+// Two-stage delete: first click arms it, second click (within the window) confirms.
+ctxDeleteEl.addEventListener('click', () => {
+  if (!ctxEl) return closeCtx();
+  if (!ctxDeleteArmed) {
+    ctxDeleteArmed = true;
+    ctxDeleteEl.textContent = '⚠ Click Again to Confirm';
+    ctxDeleteEl.classList.add('armed');
+    ctxDelTimeout = setTimeout(resetCtxDeleteArm, 2200);
+  } else {
+    clearTimeout(ctxDelTimeout);
+    doDeleteToken(ctxEl);
+    closeCtx();
+  }
+});
+document.getElementById('ctx-cond-btn').addEventListener('click', () => {
+  const inp = document.getElementById('ctx-cond-input');
+  addBadge(ctxCondWrap, inp.value); inp.value = ''; inp.focus();
+});
+document.getElementById('ctx-cond-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('ctx-cond-btn').click();
+  e.stopPropagation();
+});
+
+// ── Rename Modal ─────────────────────────────────────────────
+const modalOverlay = document.getElementById('modal-overlay');
+const modalInput   = document.getElementById('modal-input');
+
+function openModal() {
+  modalInput.value = ctxEl?.dataset.name || '';
+  modalOverlay.classList.add('open');
+  setTimeout(() => modalInput.focus(), 40);
+}
+const doRename = () => {
+  const v = modalInput.value.trim();
+  if (!v || !ctxEl) return closeModal();
+  ctxEl.dataset.name = v;
+  ctxInitial.textContent = v[0].toUpperCase();
+  ctxLabel.textContent   = v;
+  document.getElementById('ctx-token-name').textContent = v;
+  // Update initiative row if it exists
+  if (initOpen) {
+    const id = ctxEl.dataset.initId;
+    if (id) {
+      const row = initRows.find(r => r.id === id);
+      if (row) { row.name = v; renderInitList(); }
+    }
+  }
+  closeModal();
+};
+const closeModal = () => modalOverlay.classList.remove('open');
+document.getElementById('modal-confirm').addEventListener('click', doRename);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+modalInput.addEventListener('keydown', e => { if (e.key === 'Enter') doRename(); e.stopPropagation(); });
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+// ── Drag ─────────────────────────────────────────────────────
+// Tokens show a live distance readout (in grid squares / feet) plus a dashed
+// line back to their starting point while being dragged, so you know how far
+// you're about to move something before you let go.
+function makeDraggable(el) {
+  let on=false, sx,sy,sl,st;
+  const dn=(cx,cy)=>{
+    if (measureMode || aoeMode) return; // don't fight with the measure/AoE tools
+    on=true; el.classList.add('dragging'); sl=parseFloat(el.style.left); st=parseFloat(el.style.top); sx=cx; sy=cy;
+  };
+  const mv=(cx,cy)=>{
+    if(!on) return;
+    const nl = sl+cx-sx, nt = st+cy-sy;
+    el.style.left = nl+'px'; el.style.top = nt+'px';
+    const dist = Math.hypot(nl-sl, nt-st);
+    if (dist > 3) {
+      drawFXLine({x:sl,y:st}, {x:nl,y:nt});
+      showDragTip(cx, cy, formatDistance(dist));
+    } else {
+      clearFX(); hideDragTip();
+    }
+  };
+  const up=()=>{ on=false; el.classList.remove('dragging'); clearFX(); hideDragTip(); };
+  el.addEventListener('mousedown',  e=>{ if(e.button) return; e.stopPropagation(); e.preventDefault(); dn(e.clientX,e.clientY); });
+  el.addEventListener('touchstart', e=>{ e.stopPropagation(); e.preventDefault(); dn(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+  document.addEventListener('mousemove',  e=>mv(e.clientX,e.clientY));
+  document.addEventListener('touchmove',  e=>{ if(on) mv(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+  document.addEventListener('mouseup',  up);
+  document.addEventListener('touchend', up);
+}
+
+// Same idea, simplified, for AoE templates: they only move, no distance readout.
+function makeShapeDraggable(el) {
+  let on=false, sx,sy,sl,st;
+  const dn=(cx,cy)=>{ on=true; el.classList.add('dragging'); sl=parseFloat(el.style.left); st=parseFloat(el.style.top); sx=cx; sy=cy; };
+  const mv=(cx,cy)=>{ if(!on) return; el.style.left=(sl+cx-sx)+'px'; el.style.top=(st+cy-sy)+'px'; };
+  const up=()=>{ on=false; el.classList.remove('dragging'); };
+  el.addEventListener('mousedown',  e=>{ if(e.button || e.target.classList.contains('aoe-delete')) return; e.stopPropagation(); e.preventDefault(); dn(e.clientX,e.clientY); });
+  el.addEventListener('touchstart', e=>{ if(e.target.classList.contains('aoe-delete')) return; e.stopPropagation(); e.preventDefault(); dn(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+  document.addEventListener('mousemove',  e=>mv(e.clientX,e.clientY));
+  document.addEventListener('touchmove',  e=>{ if(on) mv(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+  document.addEventListener('mouseup',  up);
+  document.addEventListener('touchend', up);
+}
+
+// ── Measure & AoE tools ─────────────────────────────────────────
+// Both tools work the same way: click-drag on the board, see a live
+// size/distance readout as you drag, release to finish (AoE also drops a
+// persistent, movable, deletable template). The two modes are mutually
+// exclusive with each other and briefly disable token-dragging so a click
+// on a token doesn't accidentally move it instead.
+let measureMode = false, aoeMode = false;
+let measuring = false, measAnchor = null;
+let aoeDrawing = false, aoeAnchor = null, aoeCur = null;
+let aoeShapeType = 'circle';
+const AOE_COLORS = ['#e05252','#52a0e0','#52c068','#e0c052','#b052e0','#52d8d0'];
+let aoeColor = AOE_COLORS[0];
+let aoeShapes = [];
+
+const boardEl       = document.getElementById('board');
+const measureBtn    = document.getElementById('measure-toggle-btn');
+const aoeBtn        = document.getElementById('aoe-toggle-btn');
+const aoeOptions    = document.getElementById('aoe-options');
+const aoeShapeSelect= document.getElementById('aoe-shape-select');
+const aoeColorRow   = document.getElementById('aoe-color-row');
+const clearAoeBtn   = document.getElementById('clear-aoe-btn');
+
+function updateAoeClearBtn() { clearAoeBtn.disabled = aoeShapes.length === 0; }
+clearAoeBtn.addEventListener('click', () => {
+  aoeShapes.forEach(s => s.remove());
+  aoeShapes = [];
+  updateAoeClearBtn();
+});
+
+AOE_COLORS.forEach(hex => {
+  const sw = document.createElement('div');
+  sw.className = 'color-swatch' + (hex === aoeColor ? ' selected' : '');
+  sw.style.background = hex;
+  sw.addEventListener('click', () => {
+    aoeColorRow.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+    sw.classList.add('selected');
+    aoeColor = hex;
+  });
+  aoeColorRow.appendChild(sw);
+});
+aoeShapeSelect.addEventListener('change', e => { aoeShapeType = e.target.value; });
+
+measureBtn.addEventListener('click', () => {
+  measureMode = !measureMode;
+  if (measureMode && aoeMode) { aoeMode = false; aoeBtn.classList.remove('active'); aoeOptions.classList.remove('open'); }
+  measureBtn.classList.toggle('active', measureMode);
+  boardEl.style.cursor = measureMode ? 'crosshair' : '';
+});
+aoeBtn.addEventListener('click', () => {
+  aoeMode = !aoeMode;
+  if (aoeMode && measureMode) { measureMode = false; measureBtn.classList.remove('active'); }
+  aoeBtn.classList.toggle('active', aoeMode);
+  aoeOptions.classList.toggle('open', aoeMode);
+  boardEl.style.cursor = aoeMode ? 'crosshair' : '';
+});
+
+function pointerXY(e) {
+  const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+  return { x: t.clientX, y: t.clientY };
+}
+
+function boardDown(e) {
+  if (!measureMode && !aoeMode) return;
+  if (e.target.closest('.aoe-delete, .token-delete')) return;
+  const p = pointerXY(e);
+  const origin = toBoardCoords(p.x, p.y);
+  if (measureMode) { measuring = true; measAnchor = origin; }
+  else { aoeDrawing = true; aoeAnchor = origin; aoeCur = origin; }
+  e.preventDefault();
+}
+boardEl.addEventListener('mousedown', boardDown);
+boardEl.addEventListener('touchstart', boardDown, {passive:false});
+
+function boardMove(e) {
+  if (!measuring && !aoeDrawing) return;
+  const p = pointerXY(e);
+  const cur = toBoardCoords(p.x, p.y);
+  if (measuring) {
+    const dist = Math.hypot(cur.x - measAnchor.x, cur.y - measAnchor.y);
+    drawFXLine(measAnchor, cur);
+    showDragTip(p.x, p.y, formatDistance(dist));
+  } else if (aoeDrawing) {
+    aoeCur = cur;
+    const geo = drawAoEPreview(aoeShapeType, aoeAnchor, cur);
+    showDragTip(p.x, p.y, geo.label);
+  }
+}
+document.addEventListener('mousemove', boardMove);
+document.addEventListener('touchmove', e => { if (measuring || aoeDrawing) boardMove(e); }, {passive:false});
+
+function boardUp() {
+  if (measuring) { measuring = false; clearFX(); hideDragTip(); }
+  if (aoeDrawing) {
+    aoeDrawing = false; clearFX(); hideDragTip();
+    const dist = Math.hypot(aoeCur.x - aoeAnchor.x, aoeCur.y - aoeAnchor.y);
+    if (dist > 6) {
+      const geo = computeAoEGeometry(aoeShapeType, aoeAnchor, aoeCur);
+      createAoE(aoeShapeType, aoeAnchor, geo, aoeColor);
+    }
+  }
+}
+document.addEventListener('mouseup', boardUp);
+document.addEventListener('touchend', boardUp);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (measuring) { measuring = false; clearFX(); hideDragTip(); }
+  if (aoeDrawing) { aoeDrawing = false; clearFX(); hideDragTip(); }
+});
+
+// Geometry shared by the live preview and the finished template: the drag
+// distance is snapped to the nearest half-square so shapes line up with the grid.
+function computeAoEGeometry(shapeType, anchor, cur) {
+  const dx = cur.x - anchor.x, dy = cur.y - anchor.y;
+  const rawDist = Math.hypot(dx, dy);
+  const sq = Math.max(0.5, roundHalf(pxToSquares(rawDist)));
+  const snappedPx = sq * gridPxVal();
+  const angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+  const ft = Math.round(sq * feetPerSquareVal());
+  return { snappedPx, angleDeg, sq, ft, label: `${sq} sq · ${ft} ft` };
+}
+
+function drawAoEPreview(shapeType, anchor, cur) {
+  const geo = computeAoEGeometry(shapeType, anchor, cur);
+  clearFX();
+  fxCtx.save();
+  fxCtx.strokeStyle = aoeColor;
+  fxCtx.fillStyle = hexToRgba(aoeColor, 0.25);
+  fxCtx.lineWidth = 2;
+  fxCtx.setLineDash([5,4]);
+  const L = geo.snappedPx;
+  if (shapeType === 'circle') {
+    fxCtx.beginPath(); fxCtx.arc(anchor.x, anchor.y, L, 0, Math.PI*2); fxCtx.fill(); fxCtx.stroke();
+  } else if (shapeType === 'square') {
+    fxCtx.beginPath(); fxCtx.rect(anchor.x-L, anchor.y-L, L*2, L*2); fxCtx.fill(); fxCtx.stroke();
+  } else if (shapeType === 'line') {
+    const w = gridPxVal();
+    fxCtx.save();
+    fxCtx.translate(anchor.x, anchor.y);
+    fxCtx.rotate(geo.angleDeg * Math.PI/180);
+    fxCtx.beginPath(); fxCtx.rect(0, -w/2, L, w); fxCtx.fill(); fxCtx.stroke();
+    fxCtx.restore();
+  } else if (shapeType === 'cone') {
+    const half = 26.565 * Math.PI/180;
+    const ang = geo.angleDeg * Math.PI/180;
+    const p2 = { x: anchor.x + L*Math.cos(ang-half), y: anchor.y + L*Math.sin(ang-half) };
+    const p3 = { x: anchor.x + L*Math.cos(ang+half), y: anchor.y + L*Math.sin(ang+half) };
+    fxCtx.beginPath(); fxCtx.moveTo(anchor.x, anchor.y); fxCtx.lineTo(p2.x,p2.y); fxCtx.lineTo(p3.x,p3.y); fxCtx.closePath();
+    fxCtx.fill(); fxCtx.stroke();
+  }
+  fxCtx.restore();
+  return geo;
+}
+
+function createAoE(shapeType, anchor, geo, colorHex) {
+  const div = document.createElement('div');
+  div.className = 'aoe-shape aoe-' + shapeType;
+  const L = geo.snappedPx;
+  let left = anchor.x, top = anchor.y, width, height, transform;
+
+  if (shapeType === 'circle') {
+    width = height = L*2; transform = 'translate(-50%,-50%)';
+    div.style.borderRadius = '50%';
+    div.style.background = hexToRgba(colorHex, 0.28);
+  } else if (shapeType === 'square') {
+    width = height = L*2; transform = 'translate(-50%,-50%)';
+    div.style.background = hexToRgba(colorHex, 0.28);
+  } else if (shapeType === 'line') {
+    width = L; height = Math.max(10, gridPxVal()*0.6);
+    transform = `translateY(-50%) rotate(${geo.angleDeg}deg)`;
+    div.style.transformOrigin = '0% 50%';
+    div.style.background = hexToRgba(colorHex, 0.32);
+  } else { // cone
+    width = L; height = L;
+    transform = `translateY(-50%) rotate(${geo.angleDeg}deg)`;
+    div.style.transformOrigin = '0% 50%';
+    div.style.background = 'transparent';
+    div.style.border = 'none';
+    div.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;">
+      <polygon points="0,50 100,0 100,100" fill="${colorHex}" opacity="0.42"/>
+    </svg>`;
+  }
+
+  div.style.left = left+'px'; div.style.top = top+'px';
+  div.style.width = width+'px'; div.style.height = height+'px';
+  div.style.transform = transform;
+  div.style.borderColor = colorHex;
+
+  const lbl = document.createElement('div');
+  lbl.className = 'aoe-label';
+  lbl.textContent = geo.label;
+  div.appendChild(lbl);
+
+  const del = document.createElement('div');
+  del.className = 'aoe-delete';
+  del.textContent = '✕';
+  del.title = 'Remove template';
+  del.addEventListener('click', e => { e.stopPropagation(); div.remove(); aoeShapes = aoeShapes.filter(s => s !== div); updateAoeClearBtn(); });
+  div.appendChild(del);
+
+  boardEl.appendChild(div);
+  makeShapeDraggable(div);
+  aoeShapes.push(div);
+  updateAoeClearBtn();
+}
+
+// ── Clear All ─────────────────────────────────────────────────
+document.getElementById('clear-tokens-btn').addEventListener('click', () => {
+  if (!tokens.length || !confirm('Remove all tokens?')) return;
+  tokens.forEach(t => t.remove()); tokens = [];
+  initRows = []; currentTurnIdx = -1; roundNum = 1;
+  turnHistory = []; document.getElementById('prev-turn-btn').disabled = true;
+  deletedStack = []; document.getElementById('undo-delete-btn').disabled = true;
+  if (initOpen) renderInitList();
+  updateStatus();
+});
+
+// ── Undo Delete ──────────────────────────────────────────────
+// Restores the most recently removed token — position, size, conditions,
+// and its spot in the initiative order if it had one.
+const undoDeleteBtn = document.getElementById('undo-delete-btn');
+undoDeleteBtn.addEventListener('click', () => {
+  const snap = deletedStack.pop();
+  undoDeleteBtn.disabled = deletedStack.length === 0;
+  if (!snap) return;
+  const lx = parseFloat(snap.left) || 0, ly = parseFloat(snap.top) || 0;
+  createToken(snap.name, snap.color, lx, ly);
+  const el = tokens[tokens.length - 1];
+  if (snap.size) {
+    if (snap.customSize) el.dataset.customSize = snap.customSize;
+    setTokenSize(el, parseInt(snap.size));
+  }
+  const condWrap = el.querySelector('.token-conditions');
+  snap.conditions.forEach(c => addBadge(condWrap, c));
+  updateStatus();
+  if (initOpen && snap.initScore !== '') {
+    if (!el.dataset.initId) el.dataset.initId = 'init-' + (++initIdCounter);
+    const row = { id: el.dataset.initId, name: snap.name, color: snap.color, score: snap.initScore, tokenEl: el };
+    const insertAt = Math.min(Math.max(snap.initIndex, 0), initRows.length);
+    initRows.splice(insertAt, 0, row);
+    renderInitList();
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// ── INITIATIVE TRACKER ─────────────────────────────
+// ═══════════════════════════════════════════════════
+let initOpen       = false;
+let initRows       = [];   // [{ id, name, color, score, tokenEl }]
+let currentTurnIdx = -1;
+let roundNum       = 1;
+let initIdCounter  = 0;
+let turnHistory    = [];   // stack of {currentTurnIdx, roundNum} snapshots for Prev Turn
+
+const initPanel     = document.getElementById('init-panel');
+const boardWrap     = document.getElementById('board-wrap');
+const initList      = document.getElementById('init-list');
+const roundNumEl    = document.getElementById('round-num');
+const initToggleBtn = document.getElementById('init-toggle-btn');
+
+// Open / close panel
+initToggleBtn.addEventListener('click', () => {
+  initOpen = !initOpen;
+  initPanel.classList.toggle('open', initOpen);
+  boardWrap.classList.toggle('panel-open', initOpen);
+  initToggleBtn.classList.toggle('active', initOpen);
+  if (initOpen) syncInitList();
+});
+
+// Sync: pull in any tokens not yet in the list
+function syncInitList() {
+  const existingIds = new Set(initRows.map(r => r.id));
+  tokens.forEach(el => {
+    if (!el.dataset.initId) {
+      el.dataset.initId = 'init-' + (++initIdCounter);
+    }
+    if (!existingIds.has(el.dataset.initId)) {
+      initRows.push({
+        id:      el.dataset.initId,
+        name:    el.dataset.name,
+        color:   el.dataset.color,
+        score:   '',
+        tokenEl: el,
+      });
+    }
+  });
+  renderInitList();
+}
+
+// Sort by score descending (blanks go to bottom)
+function sortRows() {
+  initRows.sort((a, b) => {
+    const sa = parseFloat(a.score), sb = parseFloat(b.score);
+    if (isNaN(sa) && isNaN(sb)) return 0;
+    if (isNaN(sa)) return 1;
+    if (isNaN(sb)) return -1;
+    return sb - sa;
+  });
+  if (currentTurnIdx >= 0) {
+    // keep currentTurnIdx pointing to same row after sort
+    const activeId = initRows[currentTurnIdx]?.id;
+    currentTurnIdx = initRows.findIndex(r => r.id === activeId);
+  }
+  renderInitList();
+}
+
+function renderInitList() {
+  roundNumEl.textContent = roundNum;
+  initList.innerHTML = '';
+
+  if (!initRows.length) {
+    initList.innerHTML = '<div class="init-empty">No tokens on the board.<br>Add tokens, then click ↺ Sync.</div>';
+    clearActiveHighlights();
+    return;
+  }
+
+  initRows.forEach((row, idx) => {
+    const isCurrent = idx === currentTurnIdx;
+
+    const div = document.createElement('div');
+    div.className = 'init-row' + (isCurrent ? ' current' : '');
+
+    // Arrow indicator
+    const arrow = document.createElement('div');
+    arrow.className = 'turn-arrow';
+    arrow.textContent = '▶';
+
+    // Color dot
+    const dot = document.createElement('div');
+    dot.className = 'init-dot';
+    dot.style.background = row.color;
+
+    // Name
+    const name = document.createElement('div');
+    name.className = 'init-name';
+    name.textContent = row.name;
+    name.title = row.name;
+
+    // Score input
+    const score = document.createElement('input');
+    score.type = 'number';
+    score.className = 'init-score';
+    score.placeholder = '—';
+    score.value = row.score;
+    score.addEventListener('input',  e => { row.score = e.target.value; });
+    score.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') sortRows(); });
+    score.addEventListener('click',  e => e.stopPropagation());
+    score.addEventListener('mousedown', e => e.stopPropagation());
+
+    div.append(arrow, dot, name, score);
+    initList.appendChild(div);
+  });
+
+  applyActiveHighlights();
+}
+
+function applyActiveHighlights() {
+  // Remove all active highlights from tokens
+  tokens.forEach(t => t.classList.remove('active-turn'));
+  if (currentTurnIdx < 0 || currentTurnIdx >= initRows.length) return;
+  const active = initRows[currentTurnIdx];
+  if (active?.tokenEl) active.tokenEl.classList.add('active-turn');
+}
+
+function clearActiveHighlights() {
+  tokens.forEach(t => t.classList.remove('active-turn'));
+}
+
+// Next turn
+const prevTurnBtn = document.getElementById('prev-turn-btn');
+document.getElementById('next-turn-btn').addEventListener('click', () => {
+  if (!initRows.length) return;
+  turnHistory.push({ currentTurnIdx, roundNum });
+  if (turnHistory.length > 50) turnHistory.shift();
+  prevTurnBtn.disabled = false;
+  if (currentTurnIdx < 0) {
+    currentTurnIdx = 0;
+  } else {
+    currentTurnIdx++;
+    if (currentTurnIdx >= initRows.length) {
+      currentTurnIdx = 0;
+      roundNum++;
+    }
+  }
+  renderInitList();
+  // Scroll active row into view
+  const rows = initList.querySelectorAll('.init-row');
+  if (rows[currentTurnIdx]) rows[currentTurnIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
+
+// Previous turn — undoes the last "Next Turn" (fixes accidental skips/advances)
+prevTurnBtn.addEventListener('click', () => {
+  const prev = turnHistory.pop();
+  if (!prev) return;
+  currentTurnIdx = prev.currentTurnIdx;
+  roundNum = prev.roundNum;
+  prevTurnBtn.disabled = turnHistory.length === 0;
+  renderInitList();
+  const rows = initList.querySelectorAll('.init-row');
+  if (rows[currentTurnIdx]) rows[currentTurnIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
+
+// Sort
+document.getElementById('sort-init-btn').addEventListener('click', sortRows);
+
+// Sync (re-pull from board)
+document.getElementById('sync-init-btn').addEventListener('click', syncInitList);
+
+// Reset round + turn (keep rows & scores)
+document.getElementById('reset-init-btn').addEventListener('click', () => {
+  if (!confirm('Reset initiative? This clears turn order and round count but keeps scores.')) return;
+  currentTurnIdx = -1;
+  roundNum = 1;
+  turnHistory = [];
+  prevTurnBtn.disabled = true;
+  renderInitList();
+});
+
+// ── Token Sizing ──────────────────────────────────────────────
+const TOK_MIN = 16, TOK_MAX = 80, TOK_STEP = 8;
+let globalTokSize = 32;
+
+const tokSlider  = document.getElementById('tok-size-slider');
+const tokSizeVal = document.getElementById('tok-size-val');
+
+function updateSliderFill() {
+  const pct = ((tokSlider.value - TOK_MIN) / (TOK_MAX - TOK_MIN) * 100).toFixed(1);
+  tokSlider.style.setProperty('--pct', pct + '%');
+}
+
+tokSlider.addEventListener('input', () => {
+  globalTokSize = parseInt(tokSlider.value);
+  tokSizeVal.textContent = globalTokSize;
+  updateSliderFill();
+  // Apply to all tokens that haven't been individually resized
+  tokens.forEach(el => {
+    if (!el.dataset.customSize) setTokenSize(el, globalTokSize);
+  });
+});
+updateSliderFill();
+
+function setTokenSize(el, size) {
+  size = Math.max(TOK_MIN, Math.min(TOK_MAX, size));
+  el.style.setProperty('--tok-size', size + 'px');
+  el.dataset.size = size;
+}
+
+// Per-token resize via context menu
+document.getElementById('ctx-larger').addEventListener('click', () => {
+  if (!ctxEl) return closeCtx();
+  const cur = parseInt(ctxEl.dataset.size || globalTokSize);
+  ctxEl.dataset.customSize = '1';
+  setTokenSize(ctxEl, cur + TOK_STEP);
+  closeCtx();
+});
+document.getElementById('ctx-smaller').addEventListener('click', () => {
+  if (!ctxEl) return closeCtx();
+  const cur = parseInt(ctxEl.dataset.size || globalTokSize);
+  ctxEl.dataset.customSize = '1';
+  setTokenSize(ctxEl, cur - TOK_STEP);
+  closeCtx();
+});
+
+// ── Status ────────────────────────────────────────────────────
+function updateStatus() {
+  document.getElementById('status').textContent =
+    `TOKENS: ${tokens.length}  |  DRAGGING SHOWS DISTANCE  |  ✕ CLICK TWICE TO DELETE  |  📏 MEASURE / ◈ AOE → DRAG ON MAP  |  ⚡ ◀▶ TURNS`;
+}
+updateStatus();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MULTIPLAYER SYNC (free, via a Firebase project you create)
+     ───────────────────────────────────────────────────────────────
+     One-time setup:
+       1. Go to https://console.firebase.google.com → Add project
+          (free, no credit card).
+       2. Build → Firestore Database → Create database → any region →
+          Start in "test mode" is fine, but for a link you'll actually
+          share, use these rules instead (Firestore → Rules tab → paste
+          → Publish):
+
+            rules_version = '2';
+            service cloud.firestore {
+              match /databases/{database}/documents {
+                match /rooms/{roomId} { allow read, write: if true; }
+              }
+            }
+
+          (This keeps it open to anyone who has your room link — same
+          trust model as a shared Google Doc link. Fine for a private
+          game; don't reuse this Firebase project for anything sensitive.)
+       3. Project settings (gear icon, top left) → General tab →
+          "Your apps" → click the </> (web) icon → register an app
+          (nickname anything) → copy the `firebaseConfig` object it
+          shows you.
+       4. Paste that object over FIREBASE_CONFIG below, replacing the
+          placeholder values.
+       5. Save this file, then host it anywhere static (GitHub Pages,
+          itch.io, Netlify drop, etc.) and share the URL. Opening it
+          without a "room" in the address bar creates one automatically
+          — use "Copy Link" (top right of the page) to send that exact
+          URL to your players so they land in the same room. Opening
+          the file multiple times with different ?room= values (or
+          just opening it fresh in new tabs) gives you separate boards
+          for separate maps, matching how you already run multiple
+          windows.
+   ═══════════════════════════════════════════════════════════════ -->
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  projectId: "PASTE_YOUR_PROJECT_ID",
+  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID",
+  appId: "PASTE_YOUR_APP_ID"
+};
+
+(async function () {
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;bottom:30px;left:0;right:0;z-index:900;background:#3a1010;color:#ffd0d0;font-family:Cinzel,serif;font-size:0.68rem;letter-spacing:.05em;text-align:center;padding:6px 14px;display:none;';
+  document.body.appendChild(banner);
+  function warn(msg) { banner.textContent = msg; banner.style.display = 'block'; }
+
+  if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.indexOf('PASTE') === 0) {
+    warn('⚠ Multiplayer sync isn\'t set up — open this file and paste your Firebase config near the bottom of the script. Running local-only for now.');
+    return;
+  }
+
+  let db, docRef, doc, setDoc, onSnapshot;
+  try {
+    const appMod = await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js');
+    const fsMod  = await import('https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js');
+    const app = appMod.initializeApp(FIREBASE_CONFIG);
+    db = fsMod.getFirestore(app);
+    doc = fsMod.doc; setDoc = fsMod.setDoc; onSnapshot = fsMod.onSnapshot;
+  } catch (err) {
+    warn('⚠ Could not connect to Firebase — check your config and connection. Running local-only for now.');
+    console.error(err);
+    return;
+  }
+
+  // ── Room code ──────────────────────────────────────────────
+  const params = new URLSearchParams(location.search);
+  let roomId = params.get('room');
+  if (!roomId) {
+    roomId = Math.random().toString(36).slice(2, 8).toUpperCase();
+    params.set('room', roomId);
+    history.replaceState(null, '', location.pathname + '?' + params.toString());
+  }
+  docRef = doc(db, 'rooms', roomId);
+
+  // ── Status / room panel ──────────────────────────────────────
+  const panel = document.createElement('div');
+  panel.style.cssText = 'position:fixed;bottom:36px;right:8px;z-index:900;background:linear-gradient(180deg,#1e1408,#150f06);border:1px solid var(--gold);padding:7px 11px;font-family:Cinzel,serif;font-size:0.62rem;color:#e8c96a;letter-spacing:.05em;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.6);';
+  panel.innerHTML = '<span>\u2b24 <span id="mp-status" style="color:#8fd98f">LIVE</span> \u00b7 ROOM <b>' + roomId + '</b></span>'
+    + '<button id="mp-copy" style="background:#2e200e;border:1px solid var(--gold);color:#e8c96a;font-family:Cinzel,serif;font-size:0.6rem;padding:3px 8px;cursor:pointer;">\ud83d\udccb Copy Link</button>';
+  document.body.appendChild(panel);
+  document.getElementById('mp-copy').addEventListener('click', () => {
+    navigator.clipboard.writeText(location.href).then(() => {
+      const b = document.getElementById('mp-copy'); const old = b.textContent;
+      b.textContent = '\u2713 Copied'; setTimeout(() => b.textContent = old, 1400);
+    });
+  });
+  const statusEl = document.getElementById('mp-status');
+
+  // ── Serialize / apply board state ─────────────────────────────
+  let tokIdCounter = 0;
+  function ensureTokId(el) {
+    if (!el.dataset.tokId) el.dataset.tokId = 'tk' + (++tokIdCounter) + '_' + Math.random().toString(36).slice(2, 6);
+    return el.dataset.tokId;
+  }
+  tokens.forEach(ensureTokId);
+
+  // AoE templates: wrap createAoE so every shape (local or remote) gets a
+  // stable id and its inputs (shape/anchor/geo/color) tagged for resync.
+  let aoeIdCounter = 0;
+  function ensureAoeId(el) {
+    if (!el.dataset.aoeId) el.dataset.aoeId = 'ae' + (++aoeIdCounter) + '_' + Math.random().toString(36).slice(2, 6);
+    return el.dataset.aoeId;
+  }
+  const _origCreateAoE = createAoE;
+  createAoE = function (shapeType, anchor, geo, colorHex, forcedId) {
+    _origCreateAoE(shapeType, anchor, geo, colorHex);
+    const el = aoeShapes[aoeShapes.length - 1];
+    el.dataset.aoeId = forcedId || ('ae' + (++aoeIdCounter) + '_' + Math.random().toString(36).slice(2, 6));
+    el.dataset.shapeType = shapeType;
+    el.dataset.color = colorHex;
+    el.dataset.geo = JSON.stringify(geo);
+    if (!suppress) scheduleSync();
+  };
+  aoeShapes.forEach(ensureAoeId);
+
+  function readState() {
+    return {
+      mapImage: window.__mpMapImage || '',
+      gridSize: parseInt(document.getElementById('grid-size').value) || 50,
+      unitSize: parseFloat(document.getElementById('unit-size').value) || 5,
+      gridOn: gridOn,
+      globalTokSize: globalTokSize,
+      tokens: tokens.map(el => {
+        const cw = el.querySelector('.token-conditions');
+        return {
+          id: ensureTokId(el), name: el.dataset.name, color: el.dataset.color,
+          x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0,
+          size: el.dataset.size || String(globalTokSize),
+          customSize: el.dataset.customSize || '',
+          conditions: cw ? Array.from(cw.children).map(b => b.textContent) : [],
+        };
+      }),
+      aoe: aoeShapes.map(el => ({
+        id: ensureAoeId(el), shapeType: el.dataset.shapeType,
+        x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0,
+        geo: JSON.parse(el.dataset.geo || '{}'), color: el.dataset.color,
+      })),
+      initRows: initRows.map(r => ({ id: r.id, name: r.name, color: r.color, score: r.score, tokId: r.tokenEl ? ensureTokId(r.tokenEl) : '' })),
+      currentTurnIdx: currentTurnIdx, roundNum: roundNum,
+    };
+  }
+
+  let lastPushedJSON = '';
+  let suppress = false;
+  let pushTimer = null;
+  function scheduleSync(delay) {
+    if (suppress) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushState, delay || 450);
+  }
+  async function pushState() {
+    const state = readState();
+    const json = JSON.stringify(state);
+    if (json === lastPushedJSON) return;
+    lastPushedJSON = json;
+    try {
+      statusEl.textContent = 'SYNC\u2026'; statusEl.style.color = '#e8c96a';
+      await setDoc(docRef, state);
+      statusEl.textContent = 'LIVE'; statusEl.style.color = '#8fd98f';
+    } catch (err) {
+      statusEl.textContent = 'OFFLINE'; statusEl.style.color = '#d9706a';
+      console.error(err);
+    }
+  }
+
+  function applyState(state) {
+    suppress = true;
+    try {
+      if (state.mapImage && state.mapImage !== window.__mpMapImage) {
+        window.__mpMapImage = state.mapImage;
+        mapImg.src = state.mapImage;
+        mapImg.onload = () => {
+          document.getElementById('placeholder').style.display = 'none';
+          mapImg.classList.add('loaded');
+          resizeCanvas(); if (gridOn) drawGrid();
+        };
+      }
+      if (state.gridSize) document.getElementById('grid-size').value = state.gridSize;
+      if (state.unitSize) document.getElementById('unit-size').value = state.unitSize;
+      if (state.globalTokSize) {
+        globalTokSize = state.globalTokSize;
+        const sl = document.getElementById('tok-size-slider');
+        sl.value = globalTokSize;
+        document.getElementById('tok-size-val').textContent = globalTokSize;
+        updateSliderFill();
+      }
+      if (typeof state.gridOn === 'boolean' && state.gridOn !== gridOn) {
+        document.getElementById('grid-toggle-btn').click();
+      } else if (gridOn) { resizeCanvas(); drawGrid(); }
+
+      const remoteIds = new Set((state.tokens || []).map(t => t.id));
+      tokens.slice().forEach(el => { if (!remoteIds.has(el.dataset.tokId)) removeToken(el); });
+
+      const byId = new Map(tokens.map(el => [el.dataset.tokId, el]));
+      (state.tokens || []).forEach(t => {
+        let el = byId.get(t.id);
+        if (!el) {
+          createToken(t.name, t.color, t.x, t.y);
+          el = tokens[tokens.length - 1];
+          el.dataset.tokId = t.id;
+          byId.set(t.id, el);
+        }
+        if (!el.classList.contains('dragging')) {
+          el.style.left = t.x + 'px'; el.style.top = t.y + 'px';
+        }
+        if (el.dataset.name !== t.name) {
+          el.dataset.name = t.name;
+          el.querySelector('.token-initial').textContent = t.name[0].toUpperCase();
+          el.querySelector('.token-label').textContent = t.name;
+        }
+        if (el.dataset.color !== t.color) { el.dataset.color = t.color; el.style.background = t.color; }
+        const sz = parseInt(t.size) || globalTokSize;
+        if (parseInt(el.dataset.size) !== sz) { el.dataset.customSize = t.customSize || ''; setTokenSize(el, sz); }
+        const cw = el.querySelector('.token-conditions');
+        const cur = Array.from(cw.children).map(b => b.textContent).join('|');
+        const next = (t.conditions || []).join('|');
+        if (cur !== next) { cw.innerHTML = ''; (t.conditions || []).forEach(c => addBadge(cw, c)); }
+      });
+
+      const remoteAoeIds = new Set((state.aoe || []).map(a => a.id));
+      aoeShapes.slice().forEach(el => {
+        if (!remoteAoeIds.has(el.dataset.aoeId)) { el.remove(); aoeShapes = aoeShapes.filter(s => s !== el); }
+      });
+      updateAoeClearBtn();
+      const aoeById = new Map(aoeShapes.map(el => [el.dataset.aoeId, el]));
+      (state.aoe || []).forEach(a => {
+        let el = aoeById.get(a.id);
+        if (!el) {
+          createAoE(a.shapeType, { x: a.x, y: a.y }, a.geo, a.color, a.id);
+          el = aoeShapes[aoeShapes.length - 1];
+          aoeById.set(a.id, el);
+        }
+        if (!el.classList.contains('dragging')) {
+          el.style.left = a.x + 'px'; el.style.top = a.y + 'px';
+        }
+      });
+
+      const idToEl = new Map(tokens.map(el => [el.dataset.tokId, el]));
+      initRows = (state.initRows || []).map(r => ({ id: r.id, name: r.name, color: r.color, score: r.score, tokenEl: idToEl.get(r.tokId) || null }));
+      currentTurnIdx = (typeof state.currentTurnIdx === 'number') ? state.currentTurnIdx : -1;
+      roundNum = state.roundNum || 1;
+      renderInitList();
+      updateStatus();
+    } finally {
+      setTimeout(() => { suppress = false; }, 60);
+    }
+  }
+
+  onSnapshot(docRef, snap => {
+    if (snap.exists()) applyState(snap.data());
+  }, err => { statusEl.textContent = 'OFFLINE'; statusEl.style.color = '#d9706a'; console.error(err); });
+
+  // ── Map upload: compress + broadcast ──────────────────────────
+  // Hooking mapImg's own "load" event (rather than the file input's
+  // "change" event) sidesteps a race: the original script clears the
+  // file input's value right as it finishes, which could empty the
+  // file list before a second "change" listener got to read it.
+  function compressAndSync(blobUrl) {
+    fetch(blobUrl).then(r => r.blob()).then(blob => {
+      const img = new Image();
+      const objUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        const MAXDIM = 1280;
+        let w = img.width, h = img.height;
+        if (w > MAXDIM || h > MAXDIM) { const s = MAXDIM / Math.max(w, h); w *= s; h *= s; }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        let q = 0.72, out = c.toDataURL('image/jpeg', q);
+        while (out.length > 700000 && q > 0.3) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+        URL.revokeObjectURL(objUrl);
+        if (out.length > 900000) { warn('⚠ That map image is too large to sync even after compression — try a smaller image.'); return; }
+        window.__mpMapImage = out;
+        scheduleSync(50);
+      };
+      img.src = objUrl;
+    }).catch(err => console.error(err));
+  }
+  mapImg.addEventListener('load', () => {
+    if (suppress) return; // this load came from a remote update, not a fresh upload
+    if (mapImg.src.indexOf('blob:') !== 0) return; // not a local file selection
+    compressAndSync(mapImg.src);
+  });
+
+  // ── Local change detection (delegated, debounced) ─────────────
+  document.addEventListener('click', () => scheduleSync());
+  document.addEventListener('mouseup', () => scheduleSync());
+  document.addEventListener('touchend', () => scheduleSync());
+  document.addEventListener('input', () => scheduleSync(700));
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') scheduleSync(); });
+  new MutationObserver(() => scheduleSync(150)).observe(document.getElementById('board'), { childList: true });
+})();
+</script>
+</body>
+</html>
