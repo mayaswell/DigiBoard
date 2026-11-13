@@ -1726,6 +1726,40 @@ const FIREBASE_CONFIG = {
     compressAndSync(mapImg.src);
   });
 
+  // ── Personal map zoom (this browser only, never synced) ───────
+  // Shrinks just your view of the map. Tokens, grid and AoE follow
+  // automatically because everything is stored in map-relative units.
+  const scaleWrap = document.createElement('label');
+  scaleWrap.style.cssText = 'display:flex;align-items:center;gap:6px;border-left:1px solid rgba(201,168,76,.4);padding-left:8px;';
+  scaleWrap.innerHTML = 'MAP <input type="range" id="mp-scale" min="30" max="100" step="5" style="width:80px;accent-color:#c9a84c;"> <span id="mp-scale-val" style="min-width:2.4em;text-align:right;">100%</span>';
+  panel.appendChild(scaleWrap);
+  const scaleInput = document.getElementById('mp-scale'), scaleVal = document.getElementById('mp-scale-val');
+  let mapScale = 1;
+  try { const sv = parseFloat(localStorage.getItem('mpMapScale')); if (sv >= 0.3 && sv <= 1) mapScale = sv; } catch (e) {}
+  scaleInput.value = Math.round(mapScale * 100); scaleVal.textContent = Math.round(mapScale * 100) + '%';
+
+  function applyMapScale() {
+    mapImg.style.maxWidth = ''; mapImg.style.maxHeight = '';
+    if (!(mapImg.naturalWidth > 0)) return;
+    if (mapScale < 0.999) {
+      const w = mapImg.clientWidth, h = mapImg.clientHeight; // map's full "fit to window" size
+      if (w > 0 && h > 0) {
+        mapImg.style.maxWidth = (w * mapScale) + 'px';
+        mapImg.style.maxHeight = (h * mapScale) + 'px';
+      }
+    }
+    resizeCanvas(); if (gridOn) drawGrid();
+  }
+  scaleInput.addEventListener('input', () => {
+    mapScale = parseInt(scaleInput.value) / 100;
+    scaleVal.textContent = scaleInput.value + '%';
+    try { localStorage.setItem('mpMapScale', String(mapScale)); } catch (e) {}
+    applyMapScale();
+  });
+  mapImg.addEventListener('load', applyMapScale);
+  let wrapTimer = null;
+  new ResizeObserver(() => { clearTimeout(wrapTimer); wrapTimer = setTimeout(applyMapScale, 60); }).observe(document.getElementById('board-wrap'));
+
   // ── Re-fit everything when the map's on-screen size changes ───
   let lastBoardW = boardW(), fitTimer = null;
   new ResizeObserver(() => {
