@@ -673,7 +673,7 @@ function drawGrid() {
   const W = gridCanvas.width, H = gridCanvas.height;
   const sz = Math.max(10, parseInt(gridSizeInput.value) || 50);
   gridCtx.clearRect(0, 0, W, H);
-  gridCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+  gridCtx.strokeStyle = 'rgba(255,255,255,' + (window.__gridAlpha != null ? window.__gridAlpha : 0.18) + ')';
   gridCtx.lineWidth = 0.8;
   for (let x = 0; x <= W; x += sz) { gridCtx.beginPath(); gridCtx.moveTo(x,0); gridCtx.lineTo(x,H); gridCtx.stroke(); }
   for (let y = 0; y <= H; y += sz) { gridCtx.beginPath(); gridCtx.moveTo(0,y); gridCtx.lineTo(W,y); gridCtx.stroke(); }
@@ -1732,7 +1732,33 @@ const FIREBASE_CONFIG = {
   const scaleWrap = document.createElement('label');
   scaleWrap.style.cssText = 'display:flex;align-items:center;gap:6px;border-left:1px solid rgba(201,168,76,.4);padding-left:8px;';
   scaleWrap.innerHTML = 'MAP <input type="range" id="mp-scale" min="30" max="100" step="5" style="width:80px;accent-color:#c9a84c;"> <span id="mp-scale-val" style="min-width:2.4em;text-align:right;">100%</span>';
-  panel.appendChild(scaleWrap);
+  // Two-row layout: status/copy on top, personal view controls below
+  const row1 = document.createElement('div');
+  row1.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  while (panel.firstChild) row1.appendChild(panel.firstChild);
+  panel.appendChild(row1);
+  panel.style.flexDirection = 'column'; panel.style.alignItems = 'stretch'; panel.style.gap = '6px';
+  const row2 = document.createElement('div');
+  row2.style.cssText = 'display:flex;align-items:center;gap:12px;';
+  scaleWrap.style.cssText = 'display:flex;align-items:center;gap:6px;';
+  row2.appendChild(scaleWrap);
+  panel.appendChild(row2);
+
+  // Personal grid brightness (this browser only, never synced)
+  const gridWrap = document.createElement('label');
+  gridWrap.style.cssText = 'display:flex;align-items:center;gap:6px;';
+  gridWrap.innerHTML = 'GRID <input type="range" id="mp-grid-alpha" min="5" max="80" step="5" style="width:80px;accent-color:#c9a84c;"> <span id="mp-grid-val" style="min-width:2.4em;text-align:right;"></span>';
+  row2.appendChild(gridWrap);
+  const gaInput = document.getElementById('mp-grid-alpha'), gaVal = document.getElementById('mp-grid-val');
+  window.__gridAlpha = 0.18;
+  try { const gv = parseFloat(localStorage.getItem('mpGridAlpha')); if (gv >= 0.05 && gv <= 0.8) window.__gridAlpha = gv; } catch (e) {}
+  gaInput.value = Math.round(window.__gridAlpha * 100); gaVal.textContent = gaInput.value + '%';
+  gaInput.addEventListener('input', () => {
+    window.__gridAlpha = parseInt(gaInput.value) / 100;
+    gaVal.textContent = gaInput.value + '%';
+    try { localStorage.setItem('mpGridAlpha', String(window.__gridAlpha)); } catch (e) {}
+    if (gridOn) drawGrid();
+  });
   const scaleInput = document.getElementById('mp-scale'), scaleVal = document.getElementById('mp-scale-val');
   let mapScale = 1;
   try { const sv = parseFloat(localStorage.getItem('mpMapScale')); if (sv >= 0.3 && sv <= 1) mapScale = sv; } catch (e) {}
