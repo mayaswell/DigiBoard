@@ -1454,7 +1454,6 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "990641816574",
 
   appId: "1:990641816574:web:455c1e9f131e448f91f6af"
-
 };
 
 (async function () {
@@ -1532,27 +1531,47 @@ const FIREBASE_CONFIG = {
   };
   aoeShapes.forEach(ensureAoeId);
 
+  // ── Screen-size independence ────────────────────────────────
+  // Everyone's map is scaled to fit their own window, so raw pixels
+  // differ per screen. Sync in "map units" (1000 = full map width)
+  // and convert to/from local pixels on each screen.
+  const REF = 1000;
+  const boardW = () => (mapImg.complete && mapImg.naturalWidth > 0 && mapImg.offsetWidth > 0) ? mapImg.offsetWidth : 660;
+  const r3 = v => Math.round(v * 1000) / 1000;
+  const refCache = {}; // keeps whole-pixel inputs from drifting between screens
+  function toRef(px) { return r3(px * REF / boardW()); }
+  function toRefInt(key, loc) {
+    const c = refCache[key];
+    return (c && c.loc === loc) ? c.ref : toRef(loc);
+  }
+  function fromRefInt(key, ref, K, min, max) {
+    const loc = Math.max(min, Math.min(max, Math.round(ref * K)));
+    refCache[key] = { ref: ref, loc: loc };
+    return loc;
+  }
+
   function readState() {
     return {
+      v: 2,
       mapImage: window.__mpMapImage || '',
-      gridSize: parseInt(document.getElementById('grid-size').value) || 50,
+      gridSize: toRefInt('grid', parseInt(document.getElementById('grid-size').value) || 50),
       unitSize: parseFloat(document.getElementById('unit-size').value) || 5,
       gridOn: gridOn,
-      globalTokSize: globalTokSize,
+      globalTokSize: toRefInt('gts', globalTokSize),
       tokens: tokens.map(el => {
         const cw = el.querySelector('.token-conditions');
         return {
           id: ensureTokId(el), name: el.dataset.name, color: el.dataset.color,
-          x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0,
-          size: el.dataset.size || String(globalTokSize),
+          x: toRef(parseFloat(el.style.left) || 0), y: toRef(parseFloat(el.style.top) || 0),
+          size: toRefInt('tok:' + ensureTokId(el), parseInt(el.dataset.size) || globalTokSize),
           customSize: el.dataset.customSize || '',
           conditions: cw ? Array.from(cw.children).map(b => b.textContent) : [],
         };
       }),
       aoe: aoeShapes.map(el => ({
         id: ensureAoeId(el), shapeType: el.dataset.shapeType,
-        x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0,
-        geo: JSON.parse(el.dataset.geo || '{}'), color: el.dataset.color,
+        x: toRef(parseFloat(el.style.left) || 0), y: toRef(parseFloat(el.style.top) || 0),
+        geo: (g => Object.assign(g, { snappedPx: toRef(g.snappedPx || 0) }))(JSON.parse(el.dataset.geo || '{}')), color: el.dataset.color,
       })),
       initRows: initRows.map(r => ({ id: r.id, name: r.name, color: r.color, score: r.score, tokId: r.tokenEl ? ensureTokId(r.tokenEl) : '' })),
       currentTurnIdx: currentTurnIdx, roundNum: roundNum,
@@ -1569,6 +1588,7 @@ const FIREBASE_CONFIG = {
   }
   async function pushState() {
     const state = readState();
+    window.__mpRef = state;
     const json = JSON.stringify(state);
     if (json === lastPushedJSON) return;
     lastPushedJSON = json;
@@ -1585,6 +1605,11 @@ const FIREBASE_CONFIG = {
   function applyState(state) {
     suppress = true;
     try {
+      const legacy = state.v !== 2; // older rooms stored raw pixels
+      const K = legacy ? 1 : boardW() / REF;
+      if (window.__mpAoeS !== boardW()) { // map scale changed: rebuild AoE at the new size
+        aoeShapes.forEach(el => el.remove()); aoeShapes = []; window.__mpAoeS = boardW();
+      }
       if (state.mapImage && state.mapImage !== window.__mpMapImage) {
         window.__mpMapImage = state.mapImage;
         mapImg.src = state.mapImage;
@@ -1594,10 +1619,10 @@ const FIREBASE_CONFIG = {
           resizeCanvas(); if (gridOn) drawGrid();
         };
       }
-      if (state.gridSize) document.getElementById('grid-size').value = state.gridSize;
+      if (state.gridSize) document.getElementById('grid-size').value = fromRefInt('grid', state.gridSize, K, 10, 1000);
       if (state.unitSize) document.getElementById('unit-size').value = state.unitSize;
       if (state.globalTokSize) {
-        globalTokSize = state.globalTokSize;
+        globalTokSize = fromRefInt('gts', state.globalTokSize, K, TOK_MIN, TOK_MAX);
         const sl = document.getElementById('tok-size-slider');
         sl.value = globalTokSize;
         document.getElementById('tok-size-val').textContent = globalTokSize;
@@ -1614,13 +1639,13 @@ const FIREBASE_CONFIG = {
       (state.tokens || []).forEach(t => {
         let el = byId.get(t.id);
         if (!el) {
-          createToken(t.name, t.color, t.x, t.y);
+          createToken(t.name, t.color, t.x * K, t.y * K);
           el = tokens[tokens.length - 1];
           el.dataset.tokId = t.id;
           byId.set(t.id, el);
         }
         if (!el.classList.contains('dragging')) {
-          el.style.left = t.x + 'px'; el.style.top = t.y + 'px';
+          el.style.left = (t.x * K) + 'px'; el.style.top = (t.y * K) + 'px';
         }
         if (el.dataset.name !== t.name) {
           el.dataset.name = t.name;
@@ -1628,7 +1653,7 @@ const FIREBASE_CONFIG = {
           el.querySelector('.token-label').textContent = t.name;
         }
         if (el.dataset.color !== t.color) { el.dataset.color = t.color; el.style.background = t.color; }
-        const sz = parseInt(t.size) || globalTokSize;
+        const sz = t.size ? fromRefInt('tok:' + t.id, t.size, K, TOK_MIN, TOK_MAX) : globalTokSize;
         if (parseInt(el.dataset.size) !== sz) { el.dataset.customSize = t.customSize || ''; setTokenSize(el, sz); }
         const cw = el.querySelector('.token-conditions');
         const cur = Array.from(cw.children).map(b => b.textContent).join('|');
@@ -1645,12 +1670,12 @@ const FIREBASE_CONFIG = {
       (state.aoe || []).forEach(a => {
         let el = aoeById.get(a.id);
         if (!el) {
-          createAoE(a.shapeType, { x: a.x, y: a.y }, a.geo, a.color, a.id);
+          createAoE(a.shapeType, { x: a.x * K, y: a.y * K }, Object.assign({}, a.geo, { snappedPx: (a.geo.snappedPx || 0) * K }), a.color, a.id);
           el = aoeShapes[aoeShapes.length - 1];
           aoeById.set(a.id, el);
         }
         if (!el.classList.contains('dragging')) {
-          el.style.left = a.x + 'px'; el.style.top = a.y + 'px';
+          el.style.left = (a.x * K) + 'px'; el.style.top = (a.y * K) + 'px';
         }
       });
 
@@ -1660,6 +1685,7 @@ const FIREBASE_CONFIG = {
       roundNum = state.roundNum || 1;
       renderInitList();
       updateStatus();
+      if (!legacy) window.__mpRef = state;
     } finally {
       setTimeout(() => { suppress = false; }, 60);
     }
@@ -1699,6 +1725,18 @@ const FIREBASE_CONFIG = {
     if (mapImg.src.indexOf('blob:') !== 0) return; // not a local file selection
     compressAndSync(mapImg.src);
   });
+
+  // ── Re-fit everything when the map's on-screen size changes ───
+  let lastBoardW = boardW(), fitTimer = null;
+  new ResizeObserver(() => {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(() => {
+      const w = boardW();
+      if (w === lastBoardW) return;
+      lastBoardW = w;
+      if (window.__mpRef) applyState(window.__mpRef);
+    }, 80);
+  }).observe(mapImg);
 
   // ── Local change detection (delegated, debounced) ─────────────
   document.addEventListener('click', () => scheduleSync());
